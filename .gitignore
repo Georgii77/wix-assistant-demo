@@ -4,3 +4,4 @@ src/static/examples.txt
 dist/
 build/
 node_modules/
+token.json
