@@ -1,9 +1,10 @@
 import { randomUUID } from 'crypto';
 import express, { type Request, type Response} from 'express';
 import type { RedisClientType} from 'redis';
-import { iterationLLM } from '../ai/langChain.ts';
+import { iterationAgent } from '../ai/langChain.ts';
 import type { Twilio } from 'twilio';
 import { sendWithGmailAPI } from "../api/googleRefreshToken.ts";
+import logger from '../utils/logger.ts';
 
 export function twilioInboundHandler(redisClient: RedisClientType, twilioClient: Twilio): express.Router {
 
@@ -31,16 +32,31 @@ export function twilioInboundHandler(redisClient: RedisClientType, twilioClient:
 
     
             if (inboundUploader !== null) {
-            console.log('Redis message uploaded:', inboundUploader);
+            logger.info('Redis message uploaded');
             } else {
-            console.log('Redis message upload returned null');
+            logger.info('Redis message upload failed');
             }
-
 
             messageHistory.smsResponse = req.body;
 
-            const llmResponse = await iterationLLM(messageHistory, redisClient);
-            console.log('LLM Response:', llmResponse);
+            let llmResponse: { llmOutput: string; redisFlush: boolean; };
+            try{
+              llmResponse = await iterationAgent(messageHistory, redisClient);
+              console.log('LLM Response:', llmResponse);
+            }
+            catch(err)
+            {
+              res.status(503);
+
+              const messageInstance = await twilioClient.messages.create({
+              body: "Internal Error Occured - Conversation Termination",
+              messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+              to: process.env.TWILIO_PHONE_NUMBER || ""})
+
+              await redisClient.sendCommand(["FLUSHDB", "ASYNC"]);
+
+              return;
+            }
 
              const id = randomUUID();  
 
@@ -51,11 +67,10 @@ export function twilioInboundHandler(redisClient: RedisClientType, twilioClient:
                               ])
                               .exec();
 
-    
             if (redisUploader !== null) {
-            console.log('Redis message uploaded:', redisUploader);
+            logger.info('Redis message uploaded');
             } else {
-            console.log('Redis message upload returned null');
+            logger.error('Redis message upload failed');
             }
     
 
@@ -73,17 +88,30 @@ export function twilioInboundHandler(redisClient: RedisClientType, twilioClient:
 
               const [oldestKey] = await redisClient.zRange("messageKeysSorted", 0, 0);
 
-              if (oldestKey) {
-                const raw = await redisClient.get(oldestKey);
+              if (!oldestKey){
 
-                const emailRaw = JSON.parse(raw!).contact.email;
-                const email = String(emailRaw)
-                  .replace(/[\r\n]/g, "")
-                  .replace(/^"+|"+$/g, "")      
-                  .replace(/^\s*<(.+?)>\s*$/, "$1") 
-                  .trim();
+                res.status(503)
 
-              
+                logger.error("Email retrieval failed");
+
+                const messageInstance = await twilioClient.messages.create({
+                body: "Internal Error Occured - Conversation Termination",
+                messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+                to: process.env.TWILIO_PHONE_NUMBER || ""})
+
+                await redisClient.sendCommand(["FLUSHDB", "ASYNC"]);
+
+              return;
+              }
+
+              const raw = await redisClient.get(oldestKey);
+
+              const emailRaw = JSON.parse(raw!).contact.email;
+              const email = String(emailRaw)
+                .replace(/[\r\n]/g, "")
+                .replace(/^"+|"+$/g, "")      
+                .replace(/^\s*<(.+?)>\s*$/, "$1") 
+                .trim();
 
               try {
                     await sendWithGmailAPI({
@@ -92,21 +120,18 @@ export function twilioInboundHandler(redisClient: RedisClientType, twilioClient:
                       subject: "",
                       text: emailBody,
                     });
-                    console.log("Email sent successfully!");
+                    logger.info("Email sent successfully!");
                   } catch (err) {
-                    console.error("Error sending email:", err);
+                    logger.error({err},"Error sending email");
                  }
                 await redisClient.sendCommand(["FLUSHDB", "ASYNC"]);
 
-                console.log('Redis database flushed as per LLM instruction.');
-            }
+                logger.info('Redis database flushed as per LLM instruction.');
+
           }
-            console.log('Twilio message sent:', messageInstance.sid, "Message status",messageInstance.status, "Error code", messageInstance.errorCode);
-
-
                
         } catch (error) {
-            console.error('Error processing Twilio inbound request:', error);
+            logger.error({error},'Error processing Twilio inbound request');
             res.status(500).send('Internal Server Error');
         }
     });
