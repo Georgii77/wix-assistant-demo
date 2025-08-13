@@ -8,7 +8,7 @@ import { parseLeadData } from '../utils/leadParser.ts';
 import type {  RedisClientType } from 'redis';
 import { randomUUID } from 'crypto';
 
-export function wixWebHookRouter(index: Index<LeadMeta>, twilioClient: Twilio, redisClient: RedisClientType): express.Router {
+export function wixWebHookRouter(twilioClient: Twilio, redisClient: RedisClientType): express.Router {
 
 const webHookHandler = express.Router();
 
