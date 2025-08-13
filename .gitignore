@@ -1,0 +1,6 @@
+.env
+client_secret.json
+src/static/examples.txt
+dist/
+build/
+node_modules/

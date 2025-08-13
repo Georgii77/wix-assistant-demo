@@ -1,0 +1,41 @@
+{
+  "name": "wix-assistant",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon --watch src --exec \"tsx src/index.ts\"",
+    "start": "node --env-file .env -r tsx src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@langchain/core": "^0.3.66",
+    "@pinecone-database/pinecone": "^6.1.2",
+    "@types/express": "^5.0.3",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "express-xss-sanitizer": "^2.0.0",
+    "googleapis": "^155.0.1",
+    "ioredis": "^5.7.0",
+    "langchain": "^0.3.30",
+    "ngrok": "^5.0.0-beta.2",
+    "open": "^10.2.0",
+    "redis": "^5.8.0",
+    "ts-node": "^10.9.2",
+    "twilio": "^5.8.0",
+    "typescript": "^5.9.2",
+    "vectorstore": "^0.0.4",
+    "xss-clean": "^0.1.4",
+    "yargs": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/express-xss-sanitizer": "^2.0.0",
+    "@types/node": "^24.2.0",
+    "@types/yargs": "^17.0.33",
+    "nodemon": "^3.1.10",
+    "tsx": "^4.20.3"
+  }
+}
